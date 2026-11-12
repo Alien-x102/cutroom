@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Cutroom</title>
+  <meta name="description" content="Cutroom is a marketplace where creators post clipping campaigns and clippers earn for every 1K approved views.">
+  <meta name="theme-color" content="#0A0910">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Cutroom: clips that get paid by the view">
+  <meta property="og:description" content="Post a clipping campaign, or clip and earn for every 1K approved views.">
+  <meta property="og:site_name" content="Cutroom">
+  <meta property="og:url" content="__BASE__/">
+  <meta property="og:image" content="__BASE__/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Cutroom: clips that get paid by the view">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Cutroom: clips that get paid by the view">
+  <meta name="twitter:description" content="Post a clipping campaign, or clip and earn for every 1K approved views.">
+  <meta name="twitter:image" content="__BASE__/og.png">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238B5CF6'/%3E%3Cstop offset='1' stop-color='%235B21B6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='40' height='40' rx='11' fill='url(%23g)'/%3E%3Cpath d='M27.5 13.5A9.5 9.5 0 1 0 27.5 26.5' fill='none' stroke='%23fff' stroke-width='3.6' stroke-linecap='round'/%3E%3Cpath d='M19 15.8v8.4l6.6-4.2z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="lgA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8B5CF6"/><stop offset="1" stop-color="#5B21B6"/></linearGradient>
+      <symbol id="logo-mark" viewBox="0 0 40 40">
+        <rect width="40" height="40" rx="11" fill="url(#lgA)"/>
+        <path d="M27.5 13.5A9.5 9.5 0 1 0 27.5 26.5" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/>
+        <path d="M19 15.8v8.4l6.6-4.2z" fill="#fff"/>
+      </symbol>
+    </defs>
+  </svg>
+  <div class="splash" id="splash" role="status" aria-label="Loading Cutroom">
+    <svg class="splash-logo" viewBox="0 0 40 40" width="96" height="96" aria-hidden="true">
+      <defs><linearGradient id="lgS" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8B5CF6"/><stop offset="1" stop-color="#5B21B6"/></linearGradient></defs>
+      <rect class="sl-bg" width="40" height="40" rx="11" fill="url(#lgS)"/>
+      <path class="sl-c" d="M27.5 13.5A9.5 9.5 0 1 0 27.5 26.5" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" pathLength="1"/>
+      <path class="sl-p" d="M19 15.8v8.4l6.6-4.2z" fill="#fff"/>
+    </svg>
+    <b class="splash-word">Cutroom</b>
+    <div class="splash-bar" aria-hidden="true"><i></i></div>
+  </div>
+  <div class="topbar" aria-hidden="true"><i></i></div>
+  <div class="layout">
+    <aside class="side" id="side" aria-label="Main menu"></aside>
+    <div class="scrim" id="scrim" hidden></div>
+    <div class="col">
+      <header class="site-head">
+        <div class="shell head-in">
+          <button type="button" class="icon-btn burger" id="burger" aria-label="Open menu" aria-controls="side" aria-expanded="false"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+          <a class="brand" href="#home"><svg class="logo" width="30" height="30" aria-hidden="true"><use href="#logo-mark"/></svg><span class="brand-t">Cutroom</span></a>
+          <div class="auth" id="auth"></div>
+          <nav class="menu" id="menu" aria-label="Main"></nav>
+        </div>
+      </header>
+      <main class="shell" id="app"><p class="loading">Loading Cutroom…</p></main>
+      <footer class="foot">
+        <div class="shell foot-in">
+          <div class="foot-brand">
+            <a class="brand" href="#home"><svg class="logo" width="30" height="30" aria-hidden="true"><use href="#logo-mark"/></svg><span class="brand-t">Cutroom</span></a>
+            <p>Clipping campaigns, paid per view. Creators and brands post, clippers earn.</p>
+          </div>
+          <nav class="foot-links" aria-label="Footer">
+            <a href="#campaigns">Campaigns</a>
+            <a href="#home">How it works</a>
+            <a href="#contact">Contact</a>
+            <a href="#terms">Terms</a>
+            <a href="#privacy">Privacy</a>
+          </nav>
+        </div>
+        <div class="shell foot-copy">&copy; <span id="yr"></span> Cutroom. Payouts are made directly by brands to clippers.</div>
+      </footer>
+    </div>
+  </div>
+  <div class="notif" id="notif" role="dialog" aria-label="Notifications" hidden></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <script src="/app.js"></script>
+</body>
+</html>
