@@ -55,7 +55,7 @@ function parseRoute() {
   if (/^c-\d+$/.test(h)) return { name: 'campaign', id: h.slice(2) };
   if (h === 'profile') return { name: 'settings' };
   if (h === 'home' && me) return { name: 'dashboard' };
-  if (['login', 'signup', 'clips', 'manage', 'new', 'settings', 'terms', 'privacy', 'home', 'campaigns', 'dashboard', 'wallet', 'analytics', 'leaderboard', 'guide', 'rank', 'contact', 'inbox'].indexOf(h) > -1) return { name: h };
+  if (['login', 'signup', 'clips', 'manage', 'new', 'settings', 'terms', 'privacy', 'home', 'campaigns', 'dashboard', 'wallet', 'analytics', 'leaderboard', 'guide', 'rank', 'contact', 'inbox', 'brands'].indexOf(h) > -1) return { name: h };
   return { name: me ? 'dashboard' : 'home' };
 }
 function needAuth(what) {
@@ -85,7 +85,7 @@ var ICONS = {
 };
 function ico(n) { return '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">' + ICONS[n] + '</svg>'; }
 var LOGO = '<svg class="logo" width="30" height="30" aria-hidden="true"><use href="#logo-mark"/></svg><span class="brand-t">Cutroom</span>';
-var chrome = { pending: 0, bal: 0, unread: 0 }, notifs = [], notifOpen = false;
+var chrome = { pending: 0, bal: 0, unread: 0, showBal: true }, notifs = [], notifOpen = false;
 
 function navKey() {
   var n = route.name;
@@ -117,7 +117,7 @@ function setChrome() {
     return;
   }
   menu.innerHTML = '';
-  auth.innerHTML = '<a class="bal" href="#wallet" aria-label="Balance ' + esc(fmt(chrome.bal)) + '"><span>Balance</span><b>' + esc(fmt(chrome.bal)) + '</b></a>'
+  auth.innerHTML = (chrome.showBal ? '<a class="bal" href="#wallet" aria-label="Balance ' + esc(fmt(chrome.bal)) + '"><span>Balance</span><b>' + esc(fmt(chrome.bal)) + '</b></a>' : '')
     + '<button type="button" class="icon-btn" data-act="bell" aria-label="Notifications' + (chrome.unread ? ', ' + chrome.unread + ' new' : '') + '" aria-expanded="' + notifOpen + '">' + ico('bell')
     + (chrome.unread ? '<span class="dot">' + (chrome.unread > 9 ? '9+' : chrome.unread) + '</span>' : '') + '</button>'
     + '<a class="avatar" href="#settings" data-tab="profile" title="Settings" aria-label="Settings for ' + esc(me.name) + '">' + esc(initials(me.name)) + '</a>';
@@ -129,7 +129,7 @@ function setChrome() {
     + '<div class="navg">Overview</div>' + L('dashboard', 'home', 'Home') + L('analytics', 'chart', 'Analytics')
     + '<div class="navg">Clip</div>' + L('campaigns', 'compass', 'Campaigns') + L('clips', 'film', 'My clips') + L('wallet', 'wallet', 'Wallet') + L('rank', 'star', 'My rank') + L('leaderboard', 'trophy', 'Leaderboard') + L('guide', 'book', 'Clipper guide')
     + '<div class="navg">Your campaigns</div>' + L('manage', 'inbox', 'Manage', chrome.pending ? '<span class="badge">' + (chrome.pending > 99 ? '99+' : chrome.pending) + '</span>' : '') + L('new', 'plus', 'Post a campaign', '', 'cta')
-    + '<div class="navg">Account</div>' + L('settings', 'sliders', 'Settings') + L('contact', 'help', 'Help and contact') + (me.role === 'admin' ? L('inbox', 'inbox', 'Support inbox') : '')
+    + '<div class="navg">Account</div>' + L('settings', 'sliders', 'Settings') + L('contact', 'help', 'Help and contact') + (me.role === 'admin' ? L('brands', 'star', 'Brand requests') + L('inbox', 'inbox', 'Support inbox') : '')
     + '<div class="side-bottom"><button type="button" class="navl out" data-act="logout">' + ico('logout') + '<span>Log out</span></button></div>';
 }
 var statsAt = 0, statsP = null;
@@ -145,7 +145,7 @@ async function refreshBadge() {
   var r = await Promise.all([api('/campaigns').catch(function () { return null; }), getStats().catch(function () { return null; }), api('/notifications').catch(function () { return null; })]);
   if (!me) return;
   if (r[0]) { var n = 0; r[0].campaigns.forEach(function (c) { if (me.role === 'admin' || c.ownerId === me.id) n += c.pending; }); chrome.pending = n; }
-  if (r[1]) chrome.bal = r[1].clipper.pending;
+  if (r[1]) { chrome.bal = r[1].clipper.pending; chrome.showBal = !(me.role === 'admin' || r[1].owner) || r[1].clipper.total > 0; }
   if (r[2]) { notifs = r[2].items; chrome.unread = r[2].unread; }
   setChrome();
   if (notifOpen) renderNotif();
@@ -306,6 +306,16 @@ async function vClips() {
 
 function vNew() {
   if (!me) return needAuth('New campaign');
+  var bs = me.brandStatus;
+  if (me.role !== 'admin' && bs !== 'approved') {
+    var bh = '<a class="back" href="#campaigns">← Campaigns</a>' + head('Post a campaign', 'Campaigns are posted by approved brands. This keeps the site safe for clippers.');
+    if (bs === 'pending') return bh + '<div class="card narrow" style="padding:22px"><h2 class="card-h">We are reviewing your details</h2><p class="muted">Thanks, ' + esc(me.company || 'we') + (me.company ? '. We have your details' : ' have your details') + ' and will check them soon. You will get a notification here as soon as you are approved.</p><a class="btn" style="margin-top:14px" href="#contact">Questions? Contact us</a></div>';
+    if (bs === 'declined') return bh + '<div class="card narrow" style="padding:22px"><h2 class="card-h">We could not approve this yet</h2><p class="muted">Message us from the contact page if you would like to talk about it.</p><a class="btn primary" style="margin-top:14px" href="#contact">Contact us</a></div>';
+    return bh + '<form id="brandForm" class="card form narrow" novalidate><h2 class="card-h">Tell us about your brand</h2><p class="muted">Send in your details once. We check them, then you can post campaigns.</p>'
+      + '<div><label for="bCompany">Company or brand name</label><input id="bCompany" type="text" maxlength="80" autocomplete="organization"></div>'
+      + '<div><label for="bPhone">Phone number</label><input id="bPhone" type="tel" inputmode="tel" maxlength="22" autocomplete="tel" placeholder="+234 801 234 5678"></div>'
+      + '<p class="err" id="bErr" hidden></p><button class="btn primary" type="submit">Send for approval</button></form>';
+  }
   return '<a class="back" href="#campaigns">← Campaigns</a>' + head('Start a campaign', 'Share the source video, say what you will pay per 1K views, and set a budget. Clippers take it from there.')
     + '<form id="campForm" class="card form" novalidate>'
     + '<div><label for="cTitle">Campaign name</label><input id="cTitle" type="text" maxlength="80" placeholder="Podcast episode 12 highlights"></div>'
@@ -417,18 +427,28 @@ function vLogin() {
     + '<p class="err" id="lErr" hidden></p><button class="btn primary lg" type="submit">Log in</button>'
     + '<p class="switch">New here? <a href="#signup"><b>Create an account</b></a></p></form></div>';
 }
+var SIGNUP_COPY = {
+  clipper: ['Create your Cutroom account.', 'Free to join. Find a campaign, post clips, and get paid for the views they earn.', ['Earn per 1K approved views', 'Pick campaigns that fit your niche', 'Add your crypto wallet once, share it only after approval']],
+  brand: ['Reach clippers for your brand.', 'Tell us who you are. We check every brand before it can post, so clippers know they can trust the campaigns.', ['Clippers cut and post your content for you', 'You set the rate per 1K views and the budget', 'You only pay for views you approve']]
+};
+function setSignupIntro(brand) {
+  var c = SIGNUP_COPY[brand ? 'brand' : 'clipper'], h = document.getElementById('sIntroH');
+  if (!h) return;
+  h.textContent = c[0]; document.getElementById('sIntroP').textContent = c[1];
+  document.getElementById('sIntroL').innerHTML = c[2].map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('');
+}
 function vSignup() {
   if (me) { location.hash = 'dashboard'; return ''; }
-  return '<div class="auth-wrap"><div class="auth-side"><h1>Create your Cutroom account.</h1>'
-    + '<p class="muted">Free to join. Clip for pay, or post campaigns of your own. One account does both.</p>'
-    + '<ul class="ticks"><li>Earn per 1K approved views</li><li>Post a campaign with your own rate and budget</li><li>Add your wallet once, share it only after approval</li></ul></div>'
+  return '<div class="auth-wrap"><div class="auth-side"><h1 id="sIntroH"></h1><p class="muted" id="sIntroP"></p><ul class="ticks" id="sIntroL"></ul></div>'
     + '<form id="signupForm" class="card form auth-card" novalidate><h2 class="card-h">Sign up</h2>'
     + oauthBlock()
     + '<fieldset class="intent"><legend>What brings you here?</legend>'
     + '<label class="opt" for="iClip"><input id="iClip" type="radio" name="intent" value="clipper" checked><span><b>I want to clip and earn</b><small>Browse campaigns and submit clips</small></span></label>'
     + '<label class="opt" for="iBrand"><input id="iBrand" type="radio" name="intent" value="brand"><span><b>I want to post a campaign</b><small>Brand or creator looking for clippers</small></span></label></fieldset>'
-    + '<div><label for="sName">Name</label><input id="sName" type="text" autocomplete="name" maxlength="60"></div>'
-    + '<div><label for="sEmail">Email</label><input id="sEmail" type="email" autocomplete="email" inputmode="email"></div>'
+    + '<div><label for="sName" id="sNameL">Name</label><input id="sName" type="text" autocomplete="name" maxlength="60"></div>'
+    + '<div id="brandFields" hidden><div><label for="sCompany">Company or brand name</label><input id="sCompany" type="text" autocomplete="organization" maxlength="80"></div>'
+    + '<div><label for="sPhone">Phone number</label><input id="sPhone" type="tel" autocomplete="tel" inputmode="tel" maxlength="22" placeholder="+234 801 234 5678"><p class="hint">We may call or message to confirm who you are. Brand accounts are checked before they can post.</p></div></div>'
+    + '<div><label for="sEmail" id="sEmailL">Email</label><input id="sEmail" type="email" autocomplete="email" inputmode="email"></div>'
     + pwField('sPass', 'Password', 'new-password', '<div class="meter" aria-hidden="true"><i id="sMeter" data-s="0"></i></div><p class="hint" id="sMeterTxt">At least 8 characters.</p>')
     + '<label class="check" for="sTerms"><input id="sTerms" type="checkbox"><span>I agree to the <a href="#terms" target="_blank" rel="noopener">Terms</a> and <a href="#privacy" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>'
     + '<p class="err" id="sErr" hidden></p><button class="btn primary lg" type="submit">Create account</button>'
@@ -526,18 +546,50 @@ function vPrivacy() {
 }
 
 /* ---------- dashboard, wallet, analytics ---------- */
-var anaTab = 'clipper';
+var anaTab = '';
 function moneyCards(c) {
   return '<div class="kpis k4"><a class="kpi hero" href="#wallet"><label>Balance</label><b>' + fmt(c.pending) + '</b><small>Approved and waiting for the brand to pay you</small></a>'
     + '<a class="kpi" href="#clips"><label>Pending</label><b>' + c.inReview + '</b><small>' + (c.inReview === 1 ? 'clip' : 'clips') + ' in review. Earnings appear once approved.</small></a>'
     + '<a class="kpi" href="#wallet"><label>Lifetime earnings</label><b>' + fmt(c.lifetime) + '</b><small>Everything your approved clips have earned</small></a>'
     + '<a class="kpi" href="#wallet"><label>Paid to you</label><b>' + fmt(c.paid) + '</b><small>Already sent by brands</small></a></div>';
 }
+function brandBlock(o) {
+  var out = '<div class="kpis k4">'
+    + '<a class="kpi" href="#manage"><label>Your campaigns</label><b>' + o.campaigns + '</b><small>' + o.live + ' open now. ' + fmt(o.budget) + ' in budgets</small></a>'
+    + '<a class="kpi' + (o.inReview ? ' hero' : '') + '" href="#manage"><label>Waiting for review</label><b>' + o.inReview + '</b><small>' + (o.inReview === 1 ? 'clip' : 'clips') + ' to look at. ' + o.clips + ' received in total</small></a>'
+    + '<a class="kpi" href="#manage"><label>Pending payments</label><b>' + fmt(o.owed) + '</b><small>Approved clips you have not paid yet</small></a>'
+    + '<div class="kpi"><label>Paid so far</label><b>' + fmt(o.paid) + '</b><small>' + kviews(o.views) + ' approved views from ' + o.approved + ' ' + (o.approved === 1 ? 'clip' : 'clips') + '</small></div></div>';
+  out += '<section class="panel sec-gap"><div class="panel-h"><h2>Clips received, last 14 days</h2><a href="#analytics">More stats</a></div>' + barChart(o.days, 'clips', false, 'Clips received per day for the last 14 days', 'No clips have come in recently.') + '</section>';
+  return out;
+}
+function siteBlock(o) {
+  var out = '<div class="kpis k4">'
+    + '<a class="kpi" href="#leaderboard"><label>People</label><b>' + o.people.total + '</b><small>' + o.people.newThisWeek + ' new this week. ' + o.people.clippers + ' clipping, ' + o.people.brands + (o.people.brands === 1 ? ' brand' : ' brands') + '</small></a>'
+    + '<a class="kpi" href="#campaigns"><label>Campaigns posted</label><b>' + o.campaigns.total + '</b><small>' + o.campaigns.live + ' open now. ' + fmt(o.campaigns.budget) + ' in budgets</small></a>'
+    + '<a class="kpi' + (o.clips.pending ? ' hero' : '') + '" href="#manage"><label>Waiting for review</label><b>' + o.clips.pending + '</b><small>' + (o.clips.pending === 1 ? 'clip' : 'clips') + ' to look at. ' + o.clips.total + ' sent in total</small></a>'
+    + '<div class="kpi"><label>Pending payments</label><b>' + fmt(o.money.owed) + '</b><small>Approved clips that brands have not paid yet</small></div></div>';
+  out += '<div class="kpis k4 sec-gap">'
+    + '<div class="kpi"><label>Paid so far</label><b>' + fmt(o.money.paid) + '</b><small>Marked as paid by brands</small></div>'
+    + '<div class="kpi"><label>Total earned</label><b>' + fmt(o.money.lifetime) + '</b><small>By clippers, all approved clips</small></div>'
+    + '<div class="kpi"><label>Approved views</label><b>' + kviews(o.clips.views) + '</b><small>' + o.clips.approved + ' approved, ' + o.clips.rejected + ' declined</small></div>'
+    + '<a class="kpi" href="#inbox"><label>Support messages</label><b>' + o.support.open + '</b><small>' + (o.support.open ? 'Waiting for your reply' : 'Nothing waiting') + '</small></a></div>';
+  out += '<div class="cols2 sec-gap"><section class="panel"><div class="panel-h"><h2>Clips sent in, last 14 days</h2></div>' + barChart(o.days, 'clips', false, 'Clips sent per day for the last 14 days', 'No clips have been sent in recently.') + '</section>'
+    + '<section class="panel"><div class="panel-h"><h2>Newest people</h2></div>' + (o.recent.length ? '<div class="ledger">' + o.recent.map(function (u) { return '<div class="lrow"><div><b>' + esc(u.name) + '</b><small>Joined ' + ago(u.at) + '</small></div></div>'; }).join('') + '</div>' : '<p class="note">Nobody has joined yet.</p>') + '</section></div>';
+  return out;
+}
 async function vDashboard() {
   if (!me) return needAuth('Home');
+  if (me.role === 'admin') {
+    var ov = await api('/admin/overview'), h0 = new Date().getHours();
+    var bq = ov.brandsPending ? '<a class="panel sec-gap" href="#brands" style="display:flex;align-items:center;justify-content:space-between;gap:12px;text-decoration:none"><div><b>' + ov.brandsPending + (ov.brandsPending === 1 ? ' brand is' : ' brands are') + ' waiting for approval</b><p class="note">Check their details and let them post.</p></div><span class="btn sm primary">Review</span></a>' : '';
+    return '<div class="welcome"><h1>' + (h0 < 5 ? 'Still up' : h0 < 12 ? 'Good morning' : h0 < 17 ? 'Good afternoon' : 'Good evening') + ', ' + esc(me.name.split(' ')[0]) + '</h1><p>Here is how the whole site is doing.</p></div>' + bq + siteBlock(ov);
+  }
   var res = await Promise.all([getStats(true), api('/campaigns')]);
   var clip = res[0].clipper, camps = res[1].campaigns;
   var hr = new Date().getHours(), greet = hr < 5 ? 'Still up' : hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+  if (res[0].owner && !clip.total) return '<div class="welcome"><h1>' + greet + ', ' + esc(me.name.split(' ')[0]) + '</h1><p>Here is how your campaigns are doing.</p></div>' + brandBlock(res[0].owner)
+    + '<div class="panel-h sec-gap"><h2 class="sec" style="margin:0">Your campaigns</h2><a class="btn sm primary" href="#new">Post a campaign</a></div>'
+    + (camps.filter(function (c) { return c.ownerId === me.id; }).length ? '<div class="grid">' + camps.filter(function (c) { return c.ownerId === me.id; }).slice(0, 3).map(campCard).join('') + '</div>' : '');
   var out = '<div class="welcome"><h1>' + greet + ', ' + esc(me.name.split(' ')[0]) + '</h1><p>Here is how things are looking today.</p></div>' + moneyCards(clip);
   out += rankCard(clip.xp);
   var review = 0; camps.forEach(function (c) { if (me.role === 'admin' || c.ownerId === me.id) review += c.pending; });
@@ -579,9 +631,15 @@ async function vWallet() {
 async function vAnalytics() {
   if (!me) return needAuth('Analytics');
   var st = await getStats(true), c = st.clipper, o = st.owner;
-  if (!o) anaTab = 'clipper';
-  var out = head('Analytics', 'A closer look at how your clips and campaigns are doing.');
-  if (o) out += '<div class="seg" role="tablist">' + [['clipper', 'As a clipper'], ['owner', 'As a brand']].map(function (t) {
+  var isAdmin = me.role === 'admin';
+  if (!anaTab) anaTab = isAdmin ? 'site' : (o && !c.total ? 'owner' : 'clipper');
+  if (anaTab === 'owner' && !o) anaTab = isAdmin ? 'site' : 'clipper';
+  if (anaTab === 'site' && !isAdmin) anaTab = 'clipper';
+  var out = head('Analytics', isAdmin ? 'The whole site, or just your own clips and campaigns.' : 'A closer look at how your clips and campaigns are doing.');
+  if (isAdmin) out += '<div class="seg" role="tablist">' + [['site', 'Whole site'], ['clipper', 'My clips']].concat(o ? [['owner', 'My campaigns']] : []).map(function (t) {
+    return '<button type="button" role="tab" aria-selected="' + (anaTab === t[0]) + '" class="' + (anaTab === t[0] ? 'on' : '') + '" data-act="atab" data-v="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div>';
+  if (isAdmin && anaTab === 'site') return out + siteBlock(await api('/admin/overview'));
+  if (o && !isAdmin) out += '<div class="seg" role="tablist">' + [['clipper', 'As a clipper'], ['owner', 'As a brand']].map(function (t) {
     return '<button type="button" role="tab" aria-selected="' + (anaTab === t[0]) + '" class="' + (anaTab === t[0] ? 'on' : '') + '" data-act="atab" data-v="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div>';
   if (anaTab === 'owner' && o) {
     out += '<div class="kpis k4"><div class="kpi"><label>Live campaigns</label><b>' + o.live + '</b><small>of ' + o.campaigns + ' in total</small></div>'
@@ -649,6 +707,19 @@ async function vContact() {
     + '<div><label for="ctTopic">What is it about?</label><select id="ctTopic">' + topics.map(function (t) { return '<option>' + t + '</option>'; }).join('') + '</select></div>'
     + '<div><label for="ctMsg">Message</label><textarea id="ctMsg" rows="5" maxlength="1000" placeholder="Tell us what happened. Include the campaign name or clip link if you can."></textarea></div>'
     + '<p class="err" id="ctErr" hidden></p><button class="btn primary" type="submit">Send message</button></form>';
+}
+async function vBrands() {
+  if (!me) return needAuth('Brand requests');
+  if (me.role !== 'admin') return empty('This page is for the Cutroom admin', 'If you need help, use the contact page.', '<a class="btn primary" href="#contact">Help and contact</a>');
+  var items = (await api('/brands')).items, wait = items.filter(function (m) { return m.status === 'pending'; }).length;
+  var out = head('Brand requests', wait ? wait + (wait === 1 ? ' brand is' : ' brands are') + ' waiting for your decision.' : 'No brands waiting right now.');
+  if (!items.length) return out + empty('No requests yet', 'When someone signs up as a brand, their details show up here.', '');
+  var lab = { pending: 'Waiting', approved: 'Approved', declined: 'Declined' }, kind = { pending: 'pending', approved: 'approved', declined: 'rejected' };
+  return out + '<div class="list">' + items.map(function (m) {
+    return '<article class="card clip"><div class="row"><b>' + esc(m.company) + '</b>' + pill(kind[m.status], lab[m.status]) + '</div>'
+      + '<div class="clip-meta"><span>' + esc(m.name) + '</span><span>' + ago(m.createdAt) + '</span></div>'
+      + '<p style="overflow-wrap:anywhere"><a href="mailto:' + esc(m.email) + '">' + esc(m.email || 'No email') + '</a><br><a href="tel:' + esc(m.phone.replace(/[^+\d]/g, '')) + '">' + esc(m.phone) + '</a></p>'
+      + '<div class="act">' + (m.status !== 'approved' ? '<button type="button" class="btn primary sm" data-act="brandok" data-id="' + m.id + '">Approve</button>' : '') + (m.status !== 'declined' ? '<button type="button" class="btn sm" data-act="brandno" data-id="' + m.id + '">Decline</button>' : '') + '</div></article>'; }).join('') + '</div>';
 }
 async function vInbox() {
   if (!me) return needAuth('Support inbox');
@@ -832,6 +903,7 @@ async function render(keepScroll) {
       case 'rank': html = await vRank(); break;
       case 'contact': html = await vContact(); break;
       case 'inbox': html = await vInbox(); break;
+      case 'brands': html = await vBrands(); break;
       case 'analytics': html = await vAnalytics(); break;
       case 'settings': html = vSettings(); break;
       case 'terms': html = vTerms(); break;
@@ -847,6 +919,7 @@ async function render(keepScroll) {
   clearTimeout(sk);
   if (t !== token) return;
   app.innerHTML = html;
+  if (route.name === "signup") { var ib = document.getElementById("iBrand"); setSignupIntro(!!(ib && ib.checked)); }
   window.scrollTo(0, keepScroll ? y : 0);
   setChrome();
   if (route.name === 'home') { lpSetAud(lpAud); lpSetMode(lpMode); }
@@ -890,6 +963,12 @@ document.addEventListener('click', async function (e) {
     catch (er) { toast(er.message, true); b.disabled = false; }
     return;
   }
+  if (act === 'brandok' || act === 'brandno') {
+    b.disabled = true;
+    try { await api('/brands/' + id + '/decide', { method: 'POST', body: { approve: act === 'brandok' } }); toast(act === 'brandok' ? 'Approved. They have been notified.' : 'Declined. They have been notified.'); render(true); }
+    catch (er) { toast(er.message, true); b.disabled = false; }
+    return;
+  }
   if (act === 'ctagain') { ctSent = ''; return render(true); }
   if (act === 'resolve') { b.disabled = true; try { await api('/support/' + id + '/resolve', { method: 'POST', body: { open: b.dataset.open === '1' } }); render(true); } catch (er) { toast(er.message, true); b.disabled = false; } return; }
   if (act === 'lbtab') { lbPeriod = b.dataset.v; return render(true); }
@@ -907,7 +986,7 @@ document.addEventListener('click', async function (e) {
     closeNotif();
     var hit = notifs.filter(function (n) { return n.id === nid; })[0];
     if (hit && !hit.read) { hit.read = true; chrome.unread = Math.max(0, chrome.unread - 1); setChrome(); api('/notifications/read', { method: 'POST', body: { id: nid } }).catch(function () {}); }
-    if (['manage', 'clips', 'wallet', 'campaigns', 'analytics', 'dashboard', 'rank', 'inbox', 'leaderboard', 'contact'].indexOf(link) > -1) location.hash = link;
+    if (['manage', 'clips', 'wallet', 'campaigns', 'analytics', 'dashboard', 'rank', 'inbox', 'leaderboard', 'contact', 'brands', 'new'].indexOf(link) > -1) location.hash = link;
     return;
   }
   if (act === 'pwt') { var pi = b.parentNode.querySelector('input'); var show = pi.type === 'password'; pi.type = show ? 'text' : 'password'; b.textContent = show ? 'Hide' : 'Show'; b.setAttribute('aria-label', show ? 'Hide password' : 'Show password'); return; }
@@ -948,6 +1027,13 @@ function copyText(v) {
   try { document.execCommand('copy'); } catch (e) { /* ignore */ } ta.remove();
 }
 document.addEventListener('change', function (e) {
+  if (e.target.name === 'intent') {
+    var br = document.getElementById('iBrand').checked, bf = document.getElementById('brandFields');
+    if (bf) bf.hidden = !br;
+    setSignupIntro(br);
+    document.getElementById('sNameL').textContent = br ? 'Your name' : 'Name';
+    document.getElementById('sEmailL').textContent = br ? 'Brand or work email' : 'Email';
+  }
   if (e.target.id === 'cSort') { campSort = e.target.value; var g = document.getElementById('campGrid'); if (g) g.innerHTML = campGridHtml(); }
 });
 document.addEventListener('input', function (e) {
@@ -968,9 +1054,14 @@ var forms = {
     var r = await api('/login', { method: 'POST', body: { email: val('lEmail'), password: document.getElementById('lPass').value } });
     me = r.user; toast('Welcome back, ' + me.name.split(' ')[0] + '!'); go();
   },
+  brandForm: async function () {
+    var r = await api('/brand/apply', { method: 'POST', body: { company: val('bCompany'), phone: val('bPhone') } });
+    me = r.user; toast('Sent. We will check your details soon.'); render(true);
+  },
   signupForm: async function (f) {
     if (!document.getElementById('sTerms').checked) throw { message: 'Please tick the box to agree to the Terms and Privacy Policy.' };
-    var r = await api('/signup', { method: 'POST', body: { name: val('sName'), email: val('sEmail'), password: document.getElementById('sPass').value } });
+    var isBrand = document.getElementById('iBrand').checked;
+    var r = await api('/signup', { method: 'POST', body: { name: val('sName'), email: val('sEmail'), password: document.getElementById('sPass').value, accountType: isBrand ? 'brand' : 'clipper', company: isBrand ? val('sCompany') : '', phone: isBrand ? val('sPhone') : '' } });
     me = r.user; toast('You are in. Welcome to Cutroom!');
     if (!afterLogin && document.getElementById('iBrand').checked) afterLogin = 'new';
     go();
@@ -1014,7 +1105,7 @@ var forms = {
     toast('Password updated. Other devices have been signed out.'); render(false);
   }
 };
-var errIds = { loginForm: 'lErr', signupForm: 'sErr', clipForm: 'clipErr', campForm: 'cErr', profileForm: 'pErr', payoutForm: 'payErr', socialsForm: 'socErr', passwordForm: 'wErr', contactForm: 'ctErr' };
+var errIds = { loginForm: 'lErr', signupForm: 'sErr', clipForm: 'clipErr', campForm: 'cErr', profileForm: 'pErr', payoutForm: 'payErr', socialsForm: 'socErr', passwordForm: 'wErr', contactForm: 'ctErr', brandForm: 'bErr' };
 function val(id) { return document.getElementById(id).value.trim(); }
 function go() { var to = afterLogin || 'dashboard'; afterLogin = ''; if (location.hash.replace(/^#/, '') === to) render(false); else location.hash = to; }
 
