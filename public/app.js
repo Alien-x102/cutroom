@@ -125,10 +125,10 @@ function setChrome() {
     return '<a class="navl' + (cls ? ' ' + cls : '') + '" href="#' + key + '"' + (cur === key ? ' aria-current="page"' : '') + '>' + ico(icon) + '<span>' + label + '</span>' + (extra || '') + '</a>'; };
   document.getElementById('side').innerHTML =
     '<div class="side-top"><a class="brand" href="#dashboard">' + LOGO + '</a><button type="button" class="icon-btn side-x" data-act="navclose" aria-label="Close menu">' + ico('x') + '</button></div>'
-    + '<a class="sidecard" href="#settings" data-tab="profile"><span class="avatar">' + esc(initials(me.name)) + '</span><div><b>' + esc(me.name) + '</b><small>' + (me.role === 'admin' ? 'Admin' : 'Clipper and brand') + '</small></div></a>'
+    + '<a class="sidecard" href="#settings" data-tab="profile"><span class="avatar">' + esc(initials(me.name)) + '</span><div><b>' + esc(me.name) + '</b><small>' + roleLabel() + '</small></div></a>'
     + '<div class="navg">Overview</div>' + L('dashboard', 'home', 'Home') + L('analytics', 'chart', 'Analytics')
     + '<div class="navg">Clip</div>' + L('campaigns', 'compass', 'Campaigns') + L('clips', 'film', 'My clips') + L('wallet', 'wallet', 'Wallet') + L('rank', 'star', 'My rank') + L('leaderboard', 'trophy', 'Leaderboard') + L('guide', 'book', 'Clipper guide')
-    + '<div class="navg">Your campaigns</div>' + L('manage', 'inbox', 'Manage', chrome.pending ? '<span class="badge">' + (chrome.pending > 99 ? '99+' : chrome.pending) + '</span>' : '') + L('new', 'plus', 'Post a campaign', '', 'cta')
+    + (brandish() ? '<div class="navg">Your campaigns</div>' + L('manage', 'inbox', 'Manage', chrome.pending ? '<span class="badge">' + (chrome.pending > 99 ? '99+' : chrome.pending) + '</span>' : '') + L('new', 'plus', 'Post a campaign', '', 'cta') : '')
     + '<div class="navg">Account</div>' + L('settings', 'sliders', 'Settings') + L('contact', 'help', 'Help and contact') + (me.role === 'admin' ? L('brands', 'star', 'Brand requests') + L('inbox', 'inbox', 'Support inbox') : '')
     + '<div class="side-bottom"><button type="button" class="navl out" data-act="logout">' + ico('logout') + '<span>Log out</span></button></div>';
 }
@@ -231,10 +231,10 @@ async function vCampaigns() {
     out += head('Campaigns', 'Find one you like, cut clips from the source video, post them, and earn for every 1K approved views.')
       + '<div class="act" style="margin-bottom:18px"><a class="btn primary" href="#signup">Create free account</a><a class="btn" href="#login">Log in</a></div>';
   } else {
-    out += '<div class="title-row" style="margin-bottom:6px"><div class="head" style="margin:0"><h1>Campaigns</h1></div><a class="btn primary" href="#new">Post a campaign</a></div>'
+    out += '<div class="title-row" style="margin-bottom:6px"><div class="head" style="margin:0"><h1>Campaigns</h1></div>' + (brandish() ? '<a class="btn primary" href="#new">Post a campaign</a>' : '') + '</div>'
       + '<p class="muted" style="margin-bottom:16px">Find one you enjoy clipping. You earn for every 1K approved views.</p>';
   }
-  if (!list.length) return out + empty('Nothing here just yet', me ? 'Why not start the first one? Add a source video, a rate per 1K views and a budget.' : 'New campaigns will show up here as soon as they are posted.', me ? '<a class="btn primary" href="#new">Post a campaign</a>' : '');
+  if (!list.length) return out + empty('Nothing here just yet', brandish() ? 'Why not start the first one? Add a source video, a rate per 1K views and a budget.' : 'New campaigns will show up here as soon as brands post them. Check back soon.', brandish() ? '<a class="btn primary" href="#new">Post a campaign</a>' : '');
   campData = list;
   out += '<div class="searchrow"><input id="cSearch" type="search" placeholder="Search campaigns" aria-label="Search campaigns" autocomplete="off" value="' + esc(campQ) + '">'
     + '<select id="cSort" aria-label="Sort campaigns">' + [['new', 'Newest'], ['rate', 'Highest rate'], ['left', 'Most budget left'], ['clips', 'Most clips']].map(function (o) { return '<option value="' + o[0] + '"' + (campSort === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>';
@@ -313,7 +313,7 @@ function vNew() {
     if (bs === 'declined') return bh + '<div class="card narrow" style="padding:22px"><h2 class="card-h">We could not approve this yet</h2><p class="muted">Message us from the contact page if you would like to talk about it.</p><a class="btn primary" style="margin-top:14px" href="#contact">Contact us</a></div>';
     return bh + '<form id="brandForm" class="card form narrow" novalidate><h2 class="card-h">Tell us about your brand</h2><p class="muted">Send in your details once. We check them, then you can post campaigns.</p>'
       + '<div><label for="bCompany">Company or brand name</label><input id="bCompany" type="text" maxlength="80" autocomplete="organization"></div>'
-      + '<div><label for="bPhone">Phone number</label><input id="bPhone" type="tel" inputmode="tel" maxlength="22" autocomplete="tel" placeholder="+234 801 234 5678"></div>'
+      + '<div><label for="bEmail">Email address</label><input id="bEmail" type="email" inputmode="email" autocomplete="email" maxlength="200" value="' + esc(me.email || '') + '"><p class="hint">A personal email is fine. This is how we reach you about your brand.</p></div>'
       + '<p class="err" id="bErr" hidden></p><button class="btn primary" type="submit">Send for approval</button></form>';
   }
   return '<a class="back" href="#campaigns">← Campaigns</a>' + head('Start a campaign', 'Share the source video, say what you will pay per 1K views, and set a budget. Clippers take it from there.')
@@ -416,8 +416,8 @@ function oauthBlock() {
 function vLogin() {
   if (me) { location.hash = 'dashboard'; return ''; }
   return '<div class="auth-wrap"><div class="auth-side"><h1>Welcome back to the cutroom.</h1>'
-    + '<p class="muted">Log in to track your clips, review submissions and see what you are owed.</p>'
-    + '<ul class="ticks"><li>See every clip and its status in one place</li><li>Approve clips and track payouts as a brand</li><li>Your payout details stay private</li></ul></div>'
+    + '<p class="muted">Log in to track your clips and see what you are earning.</p>'
+    + '<ul class="ticks"><li>See every clip and its status in one place</li><li>Track your earnings</li><li>Your payout details stay private</li></ul></div>'
     + '<form id="loginForm" class="card form auth-card" novalidate><h2 class="card-h">Log in</h2>'
     + oauthBlock()
     + '<div><label for="lEmail">Email</label><input id="lEmail" type="email" autocomplete="email" inputmode="email"></div>'
@@ -446,8 +446,7 @@ function vSignup() {
     + '<label class="opt" for="iClip"><input id="iClip" type="radio" name="intent" value="clipper" checked><span><b>I want to clip and earn</b><small>Browse campaigns and submit clips</small></span></label>'
     + '<label class="opt" for="iBrand"><input id="iBrand" type="radio" name="intent" value="brand"><span><b>I want to post a campaign</b><small>Brand or creator looking for clippers</small></span></label></fieldset>'
     + '<div><label for="sName" id="sNameL">Name</label><input id="sName" type="text" autocomplete="name" maxlength="60"></div>'
-    + '<div id="brandFields" hidden><div><label for="sCompany">Company or brand name</label><input id="sCompany" type="text" autocomplete="organization" maxlength="80"></div>'
-    + '<div><label for="sPhone">Phone number</label><input id="sPhone" type="tel" autocomplete="tel" inputmode="tel" maxlength="22" placeholder="+234 801 234 5678"><p class="hint">We may call or message to confirm who you are. Brand accounts are checked before they can post.</p></div></div>'
+    + '<div id="brandFields" hidden><div><label for="sCompany">Company or brand name</label><input id="sCompany" type="text" autocomplete="organization" maxlength="80"><p class="hint">Brand accounts are checked before they can post. We reach you on the email below, and a personal one is fine.</p></div></div>'
     + '<div><label for="sEmail" id="sEmailL">Email</label><input id="sEmail" type="email" autocomplete="email" inputmode="email"></div>'
     + pwField('sPass', 'Password', 'new-password', '<div class="meter" aria-hidden="true"><i id="sMeter" data-s="0"></i></div><p class="hint" id="sMeterTxt">At least 8 characters.</p>')
     + '<label class="check" for="sTerms"><input id="sTerms" type="checkbox"><span>I agree to the <a href="#terms" target="_blank" rel="noopener">Terms</a> and <a href="#privacy" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>'
@@ -608,7 +607,7 @@ async function vDashboard() {
   out += '<section class="panel"><div class="panel-h"><h2>Earnings, last 14 days</h2><a href="#analytics">More stats</a></div>' + barChart(clip.days, 'earned', true, 'Earnings per day for the last 14 days', 'Nothing here yet. Your first approved clip will show up on this chart.') + '</section></div>';
   var open = camps.filter(function (c) { return c.open; }).sort(function (a, b) { return b.createdAt - a.createdAt; }).slice(0, 3);
   out += '<div class="panel-h sec-gap"><h2 class="sec" style="margin:0">Campaigns you can jump into</h2><a class="btn sm" href="#campaigns">See all</a></div>';
-  out += open.length ? '<div class="grid">' + open.map(campCard).join('') + '</div>' : empty('No open campaigns just yet', 'Check back soon, or start one yourself.', '<a class="btn primary" href="#new">Post a campaign</a>');
+  out += open.length ? '<div class="grid">' + open.map(campCard).join('') + '</div>' : empty('No open campaigns just yet', brandish() ? 'Check back soon, or start one yourself.' : 'New campaigns from brands will show up here. Check back soon.', brandish() ? '<a class="btn primary" href="#new">Post a campaign</a>' : '');
   return out;
 }
 
@@ -664,6 +663,13 @@ async function vAnalytics() {
 }
 
 /* ---------- rank, contact, support inbox ---------- */
+function brandish() { return !!me && (me.role === 'admin' || me.brandStatus === 'approved' || me.brandStatus === 'pending'); }
+function roleLabel() {
+  if (me.role === 'admin') return 'Admin';
+  if (me.brandStatus === 'approved') return 'Brand';
+  if (me.brandStatus === 'pending') return 'Clipper, brand pending';
+  return 'Clipper';
+}
 function tierBadge(t) { return t ? '<span class="tier t-' + esc(String(t).toLowerCase()) + '">' + esc(t) + '</span>' : ''; }
 function emblem(level, tier, size) {
   return '<span class="emb t-' + esc(tier.toLowerCase()) + '" style="width:' + size + 'px;height:' + Math.round(size * 1.08) + 'px"><svg viewBox="0 0 48 52" aria-hidden="true"><path d="M24 2l19 7v15c0 12-8 21-19 26C13 45 5 36 5 24V9z" fill="currentColor" fill-opacity=".16" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><text x="24" y="33" text-anchor="middle">' + level + '</text></svg></span>';
@@ -718,7 +724,7 @@ async function vBrands() {
   return out + '<div class="list">' + items.map(function (m) {
     return '<article class="card clip"><div class="row"><b>' + esc(m.company) + '</b>' + pill(kind[m.status], lab[m.status]) + '</div>'
       + '<div class="clip-meta"><span>' + esc(m.name) + '</span><span>' + ago(m.createdAt) + '</span></div>'
-      + '<p style="overflow-wrap:anywhere"><a href="mailto:' + esc(m.email) + '">' + esc(m.email || 'No email') + '</a><br><a href="tel:' + esc(m.phone.replace(/[^+\d]/g, '')) + '">' + esc(m.phone) + '</a></p>'
+      + '<p style="overflow-wrap:anywhere"><a href="mailto:' + esc(m.brandEmail || m.email) + '">' + esc(m.brandEmail || m.email || 'No email') + '</a>' + (m.email && m.brandEmail && m.email !== m.brandEmail ? '<br><span class="muted">Login email: ' + esc(m.email) + '</span>' : '') + '</p>'
       + '<div class="act">' + (m.status !== 'approved' ? '<button type="button" class="btn primary sm" data-act="brandok" data-id="' + m.id + '">Approve</button>' : '') + (m.status !== 'declined' ? '<button type="button" class="btn sm" data-act="brandno" data-id="' + m.id + '">Decline</button>' : '') + '</div></article>'; }).join('') + '</div>';
 }
 async function vInbox() {
@@ -1032,7 +1038,7 @@ document.addEventListener('change', function (e) {
     if (bf) bf.hidden = !br;
     setSignupIntro(br);
     document.getElementById('sNameL').textContent = br ? 'Your name' : 'Name';
-    document.getElementById('sEmailL').textContent = br ? 'Brand or work email' : 'Email';
+    document.getElementById('sEmailL').textContent = br ? 'Email' : 'Email';
   }
   if (e.target.id === 'cSort') { campSort = e.target.value; var g = document.getElementById('campGrid'); if (g) g.innerHTML = campGridHtml(); }
 });
@@ -1055,13 +1061,13 @@ var forms = {
     me = r.user; toast('Welcome back, ' + me.name.split(' ')[0] + '!'); go();
   },
   brandForm: async function () {
-    var r = await api('/brand/apply', { method: 'POST', body: { company: val('bCompany'), phone: val('bPhone') } });
+    var r = await api('/brand/apply', { method: 'POST', body: { company: val('bCompany'), contactEmail: val('bEmail') } });
     me = r.user; toast('Sent. We will check your details soon.'); render(true);
   },
   signupForm: async function (f) {
     if (!document.getElementById('sTerms').checked) throw { message: 'Please tick the box to agree to the Terms and Privacy Policy.' };
     var isBrand = document.getElementById('iBrand').checked;
-    var r = await api('/signup', { method: 'POST', body: { name: val('sName'), email: val('sEmail'), password: document.getElementById('sPass').value, accountType: isBrand ? 'brand' : 'clipper', company: isBrand ? val('sCompany') : '', phone: isBrand ? val('sPhone') : '' } });
+    var r = await api('/signup', { method: 'POST', body: { name: val('sName'), email: val('sEmail'), password: document.getElementById('sPass').value, accountType: isBrand ? 'brand' : 'clipper', company: isBrand ? val('sCompany') : '' } });
     me = r.user; toast('You are in. Welcome to Cutroom!');
     if (!afterLogin && document.getElementById('iBrand').checked) afterLogin = 'new';
     go();
