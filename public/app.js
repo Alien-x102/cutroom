@@ -23,7 +23,10 @@ function detect(u) {
   } catch (e) { /* not a url */ }
   return null;
 }
-function initials(n) { var p = String(n || '?').trim().split(/\s+/); return ((p[0] || '?')[0] + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase(); }
+function initials(n) {
+  var p = String(n || '').trim().split(/\s+/).map(function (w) { return (Array.from(w).filter(function (ch) { return /[\p{L}\p{N}]/u.test(ch); })[0] || ''); }).filter(Boolean);
+  return ((p[0] || '?') + (p.length > 1 ? p[p.length - 1] : '')).toUpperCase();
+}
 function pill(k, t) { return '<span class="pill ' + k + '">' + esc(t) + '</span>'; }
 function head(t, p) { return '<div class="head"><h1>' + esc(t) + '</h1>' + (p ? '<p>' + esc(p) + '</p>' : '') + '</div>'; }
 function empty(t, p, action) { return '<div class="empty"><h3>' + esc(t) + '</h3><p>' + esc(p) + '</p>' + (action || '') + '</div>'; }
