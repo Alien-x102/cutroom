@@ -54,10 +54,43 @@ function open(file) {
       reviewed_at INTEGER,
       UNIQUE (campaign_id, url_key)
     );
+    CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL DEFAULT 'info',
+      text TEXT NOT NULL,
+      link TEXT NOT NULL DEFAULT '',
+      read INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id, read);
+    CREATE TABLE IF NOT EXISTS support_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      topic TEXT NOT NULL,
+      message TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at INTEGER NOT NULL
+    );
     CREATE INDEX IF NOT EXISTS idx_sub_campaign ON submissions(campaign_id);
     CREATE INDEX IF NOT EXISTS idx_sub_clipper ON submissions(clipper_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
   `);
+  const cols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+  if (!cols.includes('payout_type')) db.exec("ALTER TABLE users ADD COLUMN payout_type TEXT NOT NULL DEFAULT ''");
+  if (!cols.includes('payout_json')) db.exec("ALTER TABLE users ADD COLUMN payout_json TEXT NOT NULL DEFAULT '{}'");
+  const scols = db.prepare('PRAGMA table_info(support_messages)').all().map((c) => c.name);
+  if (!scols.includes('reply')) db.exec("ALTER TABLE support_messages ADD COLUMN reply TEXT NOT NULL DEFAULT ''");
+  if (!scols.includes('replied_at')) db.exec('ALTER TABLE support_messages ADD COLUMN replied_at INTEGER');
+  if (!cols.includes('show_lb')) db.exec('ALTER TABLE users ADD COLUMN show_lb INTEGER NOT NULL DEFAULT 1');
+  if (!cols.includes('socials')) db.exec("ALTER TABLE users ADD COLUMN socials TEXT NOT NULL DEFAULT '[]'");
+  if (!cols.includes('google_id')) db.exec('ALTER TABLE users ADD COLUMN google_id TEXT');
+  if (!cols.includes('x_id')) db.exec('ALTER TABLE users ADD COLUMN x_id TEXT');
+  if (!cols.includes('social')) db.exec('ALTER TABLE users ADD COLUMN social INTEGER NOT NULL DEFAULT 0');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ux_users_google ON users(google_id) WHERE google_id IS NOT NULL');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ux_users_x ON users(x_id) WHERE x_id IS NOT NULL');
   return db;
 }
 
