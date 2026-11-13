@@ -91,6 +91,7 @@ function open(file) {
   if (!cols.includes('social')) db.exec('ALTER TABLE users ADD COLUMN social INTEGER NOT NULL DEFAULT 0');
   if (!cols.includes('company')) db.exec("ALTER TABLE users ADD COLUMN company TEXT NOT NULL DEFAULT ''");
   if (!cols.includes('phone')) db.exec("ALTER TABLE users ADD COLUMN phone TEXT NOT NULL DEFAULT ''");
+  if (!cols.includes('brand_email')) db.exec("ALTER TABLE users ADD COLUMN brand_email TEXT NOT NULL DEFAULT ''");
   if (!cols.includes('brand_status')) db.exec("ALTER TABLE users ADD COLUMN brand_status TEXT NOT NULL DEFAULT ''");
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ux_users_google ON users(google_id) WHERE google_id IS NOT NULL');
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ux_users_x ON users(x_id) WHERE x_id IS NOT NULL');

@@ -175,7 +175,7 @@ function createApp(opts = {}) {
     return o;
   };
   const canPost = (u) => u.role === 'admin' || u.brand_status === 'approved';
-  const userJson = (u) => ({ id: u.id, name: u.name, company: u.company || '', phone: u.phone || '', brandStatus: u.role === 'admin' ? 'approved' : (u.brand_status || ''), email: /\.invalid$/.test(u.email) ? '' : u.email, role: u.role, payoutDetails: u.payout_details,
+  const userJson = (u) => ({ id: u.id, name: u.name, company: u.company || '', brandEmail: u.brand_email || '', brandStatus: u.role === 'admin' ? 'approved' : (u.brand_status || ''), email: /\.invalid$/.test(u.email) ? '' : u.email, role: u.role, payoutDetails: u.payout_details,
     hasPassword: !u.social, payout: payoutOf(u.payout_type, u.payout_json, u.payout_details), socials: withUrls(u.socials), showOnLeaderboard: u.show_lb !== 0, createdAt: u.created_at });
   const canManage = (user, camp) => user && (user.role === 'admin' || camp.owner_id === user.id);
 
@@ -235,27 +235,27 @@ function createApp(opts = {}) {
   const intParam = (v) => { const n = Number(v); if (!Number.isSafeInteger(n) || n < 1) throw new HttpError(404, 'Not found.'); return n; };
 
   // ----- auth -----
-  function cleanBrand(b) {
+  function cleanBrand(b, accountEmail) {
     const company = text(b.company, 'Company or brand name', 2, 80);
-    const phone = String(b.phone == null ? '' : b.phone).trim();
-    const digits = phone.replace(/\D/g, '');
-    if (!/^\+?[0-9 ()\-]{7,22}$/.test(phone) || digits.length < 7 || digits.length > 15) throw bad('Please enter a phone number we can reach, for example +234 801 234 5678.');
-    return { company, phone };
+    const email = String(b.contactEmail || accountEmail || '').trim().toLowerCase();
+    if (!email) throw bad('Please add an email address we can reach you on.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 200 || /\.invalid$/.test(email)) throw bad('That email address does not look right. Could you check it?');
+    return { company, email };
   }
   function notifyAdmins(kind, msg, link) { for (const a of all("SELECT id FROM users WHERE role = 'admin'")) notify(a.id, kind, msg, link); }
   route('POST', '/api/brand/apply', (c) => {
     limit('brandapply:' + c.user.id, 10, 3600 * 1000);
     if (c.user.role === 'admin' || c.user.brand_status === 'approved') throw new HttpError(409, 'Your brand account is already approved.');
     if (c.user.brand_status === 'pending') throw new HttpError(409, 'Your details are already with us. We will let you know soon.');
-    const b = cleanBrand(c.body);
-    run("UPDATE users SET company = ?, phone = ?, brand_status = 'pending' WHERE id = ?", b.company, b.phone, c.user.id);
+    const b = cleanBrand(c.body, c.user.email);
+    run("UPDATE users SET company = ?, brand_email = ?, brand_status = 'pending' WHERE id = ?", b.company, b.email, c.user.id);
     notifyAdmins('brand', c.user.name + ' from ' + b.company + ' applied to post campaigns.', 'brands');
     return { user: userJson(get('SELECT * FROM users WHERE id = ?', c.user.id)) };
   }, true);
   route('GET', '/api/brands', (c) => {
     needAdmin(c);
-    return { items: all("SELECT id, name, email, company, phone, brand_status, created_at FROM users WHERE brand_status != '' ORDER BY brand_status = 'pending' DESC, id DESC LIMIT 200")
-      .map((u) => ({ id: u.id, name: u.name, email: /\.invalid$/.test(u.email) ? '' : u.email, company: u.company, phone: u.phone, status: u.brand_status, createdAt: u.created_at })) };
+    return { items: all("SELECT id, name, email, company, brand_email, brand_status, created_at FROM users WHERE brand_status != '' ORDER BY brand_status = 'pending' DESC, id DESC LIMIT 200")
+      .map((u) => ({ id: u.id, name: u.name, email: /\.invalid$/.test(u.email) ? '' : u.email, company: u.company, brandEmail: u.brand_email, status: u.brand_status, createdAt: u.created_at })) };
   }, true);
   route('POST', '/api/brands/:id/decide', (c) => {
     needAdmin(c);
@@ -279,10 +279,10 @@ function createApp(opts = {}) {
     const hash = (await scrypt(pw, salt)).toString('hex');
     const isFirst = !get('SELECT id FROM users LIMIT 1');
     const role = isFirst || (adminEmail && email === adminEmail) ? 'admin' : 'user';
-    const brand = c.body.accountType === 'brand' ? cleanBrand(c.body) : null;
+    const brand = c.body.accountType === 'brand' ? cleanBrand(c.body, email) : null;
     const r = run('INSERT INTO users (email, name, pass_salt, pass_hash, role, created_at) VALUES (?, ?, ?, ?, ?, ?)', email, name, salt, hash, role, Date.now());
     if (brand) {
-      run('UPDATE users SET company = ?, phone = ?, brand_status = ? WHERE id = ?', brand.company, brand.phone, role === 'admin' ? 'approved' : 'pending', r.lastInsertRowid);
+      run('UPDATE users SET company = ?, brand_email = ?, brand_status = ? WHERE id = ?', brand.company, brand.email, role === 'admin' ? 'approved' : 'pending', r.lastInsertRowid);
       if (role !== 'admin') notifyAdmins('brand', name + ' from ' + brand.company + ' applied to post campaigns.', 'brands');
     }
     startSession(c.req, c.res, Number(r.lastInsertRowid));
