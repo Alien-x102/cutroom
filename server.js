@@ -174,7 +174,8 @@ function createApp(opts = {}) {
     }
     return o;
   };
-  const userJson = (u) => ({ id: u.id, name: u.name, email: /\.invalid$/.test(u.email) ? '' : u.email, role: u.role, payoutDetails: u.payout_details,
+  const canPost = (u) => u.role === 'admin' || u.brand_status === 'approved';
+  const userJson = (u) => ({ id: u.id, name: u.name, company: u.company || '', phone: u.phone || '', brandStatus: u.role === 'admin' ? 'approved' : (u.brand_status || ''), email: /\.invalid$/.test(u.email) ? '' : u.email, role: u.role, payoutDetails: u.payout_details,
     hasPassword: !u.social, payout: payoutOf(u.payout_type, u.payout_json, u.payout_details), socials: withUrls(u.socials), showOnLeaderboard: u.show_lb !== 0, createdAt: u.created_at });
   const canManage = (user, camp) => user && (user.role === 'admin' || camp.owner_id === user.id);
 
@@ -234,6 +235,37 @@ function createApp(opts = {}) {
   const intParam = (v) => { const n = Number(v); if (!Number.isSafeInteger(n) || n < 1) throw new HttpError(404, 'Not found.'); return n; };
 
   // ----- auth -----
+  function cleanBrand(b) {
+    const company = text(b.company, 'Company or brand name', 2, 80);
+    const phone = String(b.phone == null ? '' : b.phone).trim();
+    const digits = phone.replace(/\D/g, '');
+    if (!/^\+?[0-9 ()\-]{7,22}$/.test(phone) || digits.length < 7 || digits.length > 15) throw bad('Please enter a phone number we can reach, for example +234 801 234 5678.');
+    return { company, phone };
+  }
+  function notifyAdmins(kind, msg, link) { for (const a of all("SELECT id FROM users WHERE role = 'admin'")) notify(a.id, kind, msg, link); }
+  route('POST', '/api/brand/apply', (c) => {
+    limit('brandapply:' + c.user.id, 10, 3600 * 1000);
+    if (c.user.role === 'admin' || c.user.brand_status === 'approved') throw new HttpError(409, 'Your brand account is already approved.');
+    if (c.user.brand_status === 'pending') throw new HttpError(409, 'Your details are already with us. We will let you know soon.');
+    const b = cleanBrand(c.body);
+    run("UPDATE users SET company = ?, phone = ?, brand_status = 'pending' WHERE id = ?", b.company, b.phone, c.user.id);
+    notifyAdmins('brand', c.user.name + ' from ' + b.company + ' applied to post campaigns.', 'brands');
+    return { user: userJson(get('SELECT * FROM users WHERE id = ?', c.user.id)) };
+  }, true);
+  route('GET', '/api/brands', (c) => {
+    needAdmin(c);
+    return { items: all("SELECT id, name, email, company, phone, brand_status, created_at FROM users WHERE brand_status != '' ORDER BY brand_status = 'pending' DESC, id DESC LIMIT 200")
+      .map((u) => ({ id: u.id, name: u.name, email: /\.invalid$/.test(u.email) ? '' : u.email, company: u.company, phone: u.phone, status: u.brand_status, createdAt: u.created_at })) };
+  }, true);
+  route('POST', '/api/brands/:id/decide', (c) => {
+    needAdmin(c);
+    const u = get("SELECT * FROM users WHERE id = ? AND brand_status != ''", Number(c.params.id));
+    if (!u) throw new HttpError(404, 'We could not find that brand.');
+    const ok = c.body.approve === true;
+    run('UPDATE users SET brand_status = ? WHERE id = ?', ok ? 'approved' : 'declined', u.id);
+    notify(u.id, 'brand', ok ? 'Your brand account is approved. You can post your first campaign now.' : 'We could not approve your brand account right now. Message us from the contact page if you would like to talk about it.', ok ? 'new' : 'contact');
+    return { ok: true, status: ok ? 'approved' : 'declined' };
+  }, true);
   route('POST', '/api/signup', async (c) => {
     limit('signup:' + c.ip, 20, 3600 * 1000);
     const name = text(c.body.name, 'Name', 2, 60);
@@ -247,7 +279,12 @@ function createApp(opts = {}) {
     const hash = (await scrypt(pw, salt)).toString('hex');
     const isFirst = !get('SELECT id FROM users LIMIT 1');
     const role = isFirst || (adminEmail && email === adminEmail) ? 'admin' : 'user';
+    const brand = c.body.accountType === 'brand' ? cleanBrand(c.body) : null;
     const r = run('INSERT INTO users (email, name, pass_salt, pass_hash, role, created_at) VALUES (?, ?, ?, ?, ?, ?)', email, name, salt, hash, role, Date.now());
+    if (brand) {
+      run('UPDATE users SET company = ?, phone = ?, brand_status = ? WHERE id = ?', brand.company, brand.phone, role === 'admin' ? 'approved' : 'pending', r.lastInsertRowid);
+      if (role !== 'admin') notifyAdmins('brand', name + ' from ' + brand.company + ' applied to post campaigns.', 'brands');
+    }
     startSession(c.req, c.res, Number(r.lastInsertRowid));
     return { user: userJson(get('SELECT * FROM users WHERE id = ?', r.lastInsertRowid)) };
   });
@@ -391,6 +428,7 @@ function createApp(opts = {}) {
 
   route('POST', '/api/campaigns', (c) => {
     limit('camp:' + c.user.id, 20, 3600 * 1000);
+    if (!canPost(c.user)) throw new HttpError(403, c.user.brand_status === 'pending' ? 'Your brand account is still being reviewed. We will let you know as soon as it is approved.' : 'Only approved brands can post campaigns. Send in your brand details first.');
     const b = c.body;
     const title = text(b.title, 'Campaign name', 3, 80);
     const src = httpsUrl(b.sourceUrl, 'Source video link');
@@ -597,6 +635,31 @@ function createApp(opts = {}) {
       owner.committed = round2(owner.committed); owner.owed = round2(owner.owed); owner.paid = round2(owner.paid);
     }
     return { clipper: clip, ledger: ledger.slice(0, 50), owner };
+  }, true);
+
+  route('GET', '/api/admin/overview', (c) => {
+    needAdmin(c);
+    const days = lastDays(14), idx = (ts) => days.indexOf(Math.floor(ts / DAY) * DAY);
+    const week = Date.now() - 7 * DAY;
+    const users = get('SELECT COUNT(*) AS n, SUM(created_at > ?) AS fresh FROM users', week);
+    const camps = get("SELECT COUNT(*) AS n, SUM(status = 'open') AS live, COALESCE(SUM(budget), 0) AS budget FROM campaigns");
+    const brands = get('SELECT COUNT(DISTINCT owner_id) AS n FROM campaigns').n;
+    const clippers = get('SELECT COUNT(DISTINCT clipper_id) AS n FROM submissions').n;
+    const rows = all('SELECT s.status, s.views, s.paid, s.created_at, c.rate_per_1k AS rate FROM submissions s JOIN campaigns c ON c.id = s.campaign_id');
+    const o = { people: { total: users.n, newThisWeek: users.fresh || 0, brands, clippers },
+      campaigns: { total: camps.n, live: camps.live || 0, budget: round2(camps.budget) },
+      clips: { total: rows.length, pending: 0, approved: 0, rejected: 0, views: 0 },
+      money: { owed: 0, paid: 0, lifetime: 0 }, support: { open: get("SELECT COUNT(*) AS n FROM support_messages WHERE status = 'open'").n }, brandsPending: get("SELECT COUNT(*) AS n FROM users WHERE brand_status = 'pending'").n,
+      days: days.map((d) => ({ date: new Date(d).toISOString().slice(0, 10), clips: 0 })), recent: [] };
+    for (const r of rows) {
+      const i = idx(r.created_at); if (i > -1) o.days[i].clips++;
+      if (r.status === 'pending') o.clips.pending++;
+      else if (r.status === 'rejected') o.clips.rejected++;
+      else { const e = r.views / 1000 * r.rate; o.clips.approved++; o.clips.views += r.views; o.money.lifetime += e; if (r.paid) o.money.paid += e; else o.money.owed += e; }
+    }
+    o.money.owed = round2(o.money.owed); o.money.paid = round2(o.money.paid); o.money.lifetime = round2(o.money.lifetime);
+    o.recent = all('SELECT name, created_at FROM users ORDER BY id DESC LIMIT 5').map((u) => ({ name: u.name, at: u.created_at }));
+    return o;
   }, true);
 
   /* ---------- dispatch ---------- */
